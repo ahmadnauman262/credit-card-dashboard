@@ -1,0 +1,37 @@
+name: Continuous RBI Data Automation Sync Pipeline
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # Executes daily at 04:00 AM UTC
+  workflow_dispatch: # Allows instant force execution trigger from the GitHub UI
+
+permissions:
+  contents: write
+
+jobs:
+  ingest-and-refresh:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clone Source Blueprint
+      uses: actions/checkout@v4
+
+    - name: Setup Enterprise Python Context Environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: Ingest Runtime Execution Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests beautifulsoup4 pandas openpyxl
+
+    - name: Run Rolling Multi-Month Ingestion Scraper
+      run: python scraper.py
+
+    - name: Push Data Model Variations to Repository Storage
+      run: |
+        git config --global user.name "RBI Pipeline Automation Core"
+        git config --global user.email "pipeline-bot@github.com"
+        git add data.json
+        git diff --quiet && git diff --staged --quiet || (git commit -m "System Data Update: Synced latest rolling RBI statistics registry matrix" && git push)
